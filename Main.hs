@@ -12,4 +12,4 @@ main = do
   putStr ("Compiling maze: " ++ filename ++ "\n")
   file <- readFile filename
   let maze = parseMaze file
-  printMaze maze
+  printMaze (fst maze)

@@ -11,21 +11,27 @@ import           Prelude   hiding (Left, Right)
 
 
 data Direction = Up | Right | Down | Left
+  deriving Show
 
 data Cell = Start
           | Path
           | Wall
           | Hole
           | Splitter
-          | Function { name :: String }
+          | Function { cFunctionName :: String }
           | Once
-          | UnlessDetect { direction :: Direction }
+          | UnlessDetect { cDirection :: Direction }
           | Input
           | Output
-          | Direction { direction :: Direction }
-          | Pause { ticks :: Int }
+          | Direction { cDirection :: Direction }
+          | Pause { cTicks :: Int }
+  deriving Show
 
-type Maze = [[Cell]]
+type Maze = ([[Cell]], [FunctionDef])
+
+data FunctionDef = FunctionDef {
+  fdName :: String
+} deriving Show
 
 
 isWalkable :: Cell -> Bool
@@ -34,56 +40,82 @@ isWalkable _    = True
 
 
 parseMaze :: String -> Maze
-parseMaze file = map parseRow (lines file)
+parseMaze file = foldr collapse ([[]], []) (map parseRow (lines file))
+  where
+    collapse :: ([Cell], [FunctionDef]) -> Maze -> Maze
+    collapse (row, fds') (maze, fds) = ((row:maze), (fds'++fds))
 
-parseRow :: String -> [Cell]
-parseRow (a:b:cs) = case parseCell [a, b] of
-                      Just cell -> cell:(parseRow cs)
-                      Nothing   -> parseRow (b:cs)
-parseRow _ = []
+    parseRow :: String -> ([Cell], [FunctionDef])
+    parseRow (a:b:row) =
+      case parseCell (a, b) of
+        Nothing   -> let (cs, fds) = parseRow (b:row) in (cs, fds)
+        Just cell ->
+          case cell of
+            Function {} ->
+              case getArrow row of
+                Nothing             -> let (cs, fds) = parseRow row in (cell:cs, fds)
+                Just functionString ->
+                  case parseFunctionDef functionString of
+                    Nothing -> ([], [])
+                    Just fd -> ([], [fd])
+            otherwise   -> let (cs, fds) = parseRow row in (cell:cs, fds)
+    parseRow _ = ([], [])
 
-parseCell :: String -> Maybe Cell
-parseCell "^^" = Just Start
-parseCell ".." = Just Path
-parseCell "##" = Just Wall
-parseCell "()" = Just Hole
-parseCell "<>" = Just Splitter
-parseCell "--" = Just Once
-parseCell "*U" = Just (UnlessDetect Up)
-parseCell "*R" = Just (UnlessDetect Right)
-parseCell "*D" = Just (UnlessDetect Down)
-parseCell "*L" = Just (UnlessDetect Left)
-parseCell "<<" = Just Input
-parseCell ">>" = Just Output
-parseCell "%U" = Just (Direction Up)
-parseCell "%R" = Just (Direction Right)
-parseCell "%D" = Just (Direction Down)
-parseCell "%L" = Just (Direction Left)
-parseCell ab@(a:b:"") | isAlpha a && isAlphaNum b = Just (Function ab)
-                      | isNumber a && isNumber b  = Just (Pause (read ab))
-                      | otherwise                 = Nothing
+parseCell :: (Char, Char) -> Maybe Cell
+parseCell ('^','^') = Just Start
+parseCell ('.','.') = Just Path
+parseCell ('#','#') = Just Wall
+parseCell ('(',')') = Just Hole
+parseCell ('<','>') = Just Splitter
+parseCell ('-','-') = Just Once
+parseCell ('*','U') = Just (UnlessDetect Up)
+parseCell ('*','R') = Just (UnlessDetect Right)
+parseCell ('*','D') = Just (UnlessDetect Down)
+parseCell ('*','L') = Just (UnlessDetect Left)
+parseCell ('<','<') = Just Input
+parseCell ('>','>') = Just Output
+parseCell ('%','U') = Just (Direction Up)
+parseCell ('%','R') = Just (Direction Right)
+parseCell ('%','D') = Just (Direction Down)
+parseCell ('%','L') = Just (Direction Left)
+parseCell (a, b) | isFunction a b           = Just (Function [a, b])
+                 | isNumber a && isNumber b = Just (Pause (read [a, b]))
+                 | otherwise                = Nothing
 
-printMaze :: Maze -> IO ()
+
+isFunction :: Char -> Char -> Bool
+isFunction a b = isAlpha a && isAlphaNum b
+
+getArrow :: String -> Maybe String
+getArrow ('-':'>':rest) = Just rest
+getArrow (_:rest)       = getArrow rest
+getArrow []             = Nothing
+
+parseFunctionDef :: String -> Maybe FunctionDef
+parseFunctionDef s = Just (FunctionDef { fdName = "AA" })
+
+
+printMaze :: [[Cell]] -> IO ()
 printMaze = mapM_ (\r -> do mapM_ printCell r
                             putStr "\n")
 
 
 printCell :: Cell -> IO ()
-printCell Start                              = putStr "^^ "
-printCell Path                               = putStr ".. "
-printCell Wall                               = putStr "## "
-printCell Hole                               = putStr "() "
-printCell Splitter                           = putStr "<> "
-printCell Function { name = n }              = putStr (n ++ " ")
-printCell Once                               = putStr "-- "
-printCell UnlessDetect { direction = Up    } = putStr "*U "
-printCell UnlessDetect { direction = Right } = putStr "*R "
-printCell UnlessDetect { direction = Down  } = putStr "*D "
-printCell UnlessDetect { direction = Left  } = putStr "*L "
-printCell Input                              = putStr "<< "
-printCell Output                             = putStr ">> "
-printCell Direction { direction = Up    }    = putStr "%U "
-printCell Direction { direction = Right }    = putStr "%R "
-printCell Direction { direction = Down  }    = putStr "%D "
-printCell Direction { direction = Left  }    = putStr "%L "
-printCell Pause { ticks = t }                = putStr (show t ++ " ")
+printCell Start                               = putStr "^^ "
+printCell Path                                = putStr ".. "
+printCell Wall                                = putStr "## "
+printCell Hole                                = putStr "() "
+printCell Splitter                            = putStr "<> "
+printCell Function { cFunctionName = n }      = putStr (n ++ " ")
+printCell Once                                = putStr "-- "
+printCell UnlessDetect { cDirection = Up    } = putStr "*U "
+printCell UnlessDetect { cDirection = Right } = putStr "*R "
+printCell UnlessDetect { cDirection = Down  } = putStr "*D "
+printCell UnlessDetect { cDirection = Left  } = putStr "*L "
+printCell Input                               = putStr "<< "
+printCell Output                              = putStr ">> "
+printCell Direction { cDirection = Up    }    = putStr "%U "
+printCell Direction { cDirection = Right }    = putStr "%R "
+printCell Direction { cDirection = Down  }    = putStr "%D "
+printCell Direction { cDirection = Left  }    = putStr "%L "
+printCell Pause { cTicks = t }                = putStr (show t ++ " ")
