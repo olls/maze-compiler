@@ -9,6 +9,8 @@ module Maze (
 
 import           Prelude   hiding (Left, Right)
 
+import           Utilities
+
 
 data Direction = Up | Right | Down | Left
   deriving Show
@@ -62,4 +64,4 @@ printCell Direction { cDirection = Up    }    = putStr "%U "
 printCell Direction { cDirection = Right }    = putStr "%R "
 printCell Direction { cDirection = Down  }    = putStr "%D "
 printCell Direction { cDirection = Left  }    = putStr "%L "
-printCell Pause { cTicks = t }                = putStr (show t ++ " ")
+printCell Pause { cTicks = t }                = putStr (((zpad 2) . show) t ++ " ")
