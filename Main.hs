@@ -3,6 +3,7 @@ module Main (main) where
 import           System.Environment (getArgs)
 
 import           Maze
+import           MazeParser
 
 
 main :: IO ()
