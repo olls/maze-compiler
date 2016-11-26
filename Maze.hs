@@ -1,13 +1,17 @@
 module Maze (
-  Cell (Wall),
+  Cell (..),
   Maze,
+  Direction (..),
+  direction,
   isWalkable,
   parseMaze,
   printMaze
 ) where
 
-import           Data.Char
-import           Prelude   hiding (Left, Right)
+import           Prelude     hiding (Left, Right)
+
+import           TokenParser (Token)
+import qualified TokenParser as Tkn
 
 
 data Direction = Up | Right | Down | Left
@@ -27,11 +31,7 @@ data Cell = Start
           | Pause { cTicks :: Int }
   deriving Show
 
-type Maze = ([[Cell]], [FunctionDef])
-
-data FunctionDef = FunctionDef {
-  fdName :: String
-} deriving Show
+type Maze = [[Cell]]
 
 
 isWalkable :: Cell -> Bool
@@ -39,60 +39,40 @@ isWalkable Wall = False
 isWalkable _    = True
 
 
-parseMaze :: String -> Maze
-parseMaze file = foldr collapse ([[]], []) (map parseRow (lines file))
+direction :: String -> Direction
+direction (_:d:"") | d == 'U' || d == 'u' = Up
+direction (_:d:"") | d == 'R' || d == 'r' = Right
+direction (_:d:"") | d == 'D' || d == 'd' = Down
+direction (_:d:"") | d == 'L' || d == 'l' = Left
+
+
+parseMaze :: [Token] -> Maze
+parseMaze [] = []
+parseMaze ts =  row : parseMaze ts'
+  where (ts', row) = parseMazeRow ts
+
+parseMazeRow :: [Token] -> ([Token], [Cell])
+parseMazeRow (Tkn.NewLine:ts) = (ts, [])
+parseMazeRow [] = ([], [])
+parseMazeRow ts = case mCell of
+                    Nothing   -> (ts'', cs)
+                    Just cell -> (ts'', cell:cs)
   where
-    collapse :: ([Cell], [FunctionDef]) -> Maze -> Maze
-    collapse (row, fds') (maze, fds) = ((row:maze), (fds'++fds))
-
-    parseRow :: String -> ([Cell], [FunctionDef])
-    parseRow (a:b:row) =
-      case parseCell (a, b) of
-        Nothing   -> let (cs, fds) = parseRow (b:row) in (cs, fds)
-        Just cell ->
-          case cell of
-            Function {} ->
-              case getArrow row of
-                Nothing             -> let (cs, fds) = parseRow row in (cell:cs, fds)
-                Just functionString ->
-                  case parseFunctionDef functionString of
-                    Nothing -> ([], [])
-                    Just fd -> ([], [fd])
-            otherwise   -> let (cs, fds) = parseRow row in (cell:cs, fds)
-    parseRow _ = ([], [])
-
-parseCell :: (Char, Char) -> Maybe Cell
-parseCell ('^','^') = Just Start
-parseCell ('.','.') = Just Path
-parseCell ('#','#') = Just Wall
-parseCell ('(',')') = Just Hole
-parseCell ('<','>') = Just Splitter
-parseCell ('-','-') = Just Once
-parseCell ('*','U') = Just (UnlessDetect Up)
-parseCell ('*','R') = Just (UnlessDetect Right)
-parseCell ('*','D') = Just (UnlessDetect Down)
-parseCell ('*','L') = Just (UnlessDetect Left)
-parseCell ('<','<') = Just Input
-parseCell ('>','>') = Just Output
-parseCell ('%','U') = Just (Direction Up)
-parseCell ('%','R') = Just (Direction Right)
-parseCell ('%','D') = Just (Direction Down)
-parseCell ('%','L') = Just (Direction Left)
-parseCell (a, b) | isFunction a b           = Just (Function [a, b])
-                 | isNumber a && isNumber b = Just (Pause (read [a, b]))
-                 | otherwise                = Nothing
-
-
-isFunction :: Char -> Char -> Bool
-isFunction a b = isAlpha a && isAlphaNum b
-
-getArrow :: String -> Maybe String
-getArrow ('-':'>':rest) = Just rest
-getArrow (_:rest)       = getArrow rest
-getArrow []             = Nothing
-
-parseFunctionDef :: String -> Maybe FunctionDef
-parseFunctionDef s = Just (FunctionDef { fdName = "AA" })
+    (ts', mCell) = case ts of
+      Tkn.Start                   : rest -> (rest, Just Start)
+      Tkn.Path                    : rest -> (rest, Just Path)
+      Tkn.Wall                    : rest -> (rest, Just Wall)
+      Tkn.Hole                    : rest -> (rest, Just Hole)
+      Tkn.Splitter                : rest -> (rest, Just Splitter)
+      Tkn.Function           name : rest -> (rest, Just (Function name))
+      Tkn.Once                    : rest -> (rest, Just Once)
+      Tkn.UnlessDetect          d : rest -> (rest, Just (UnlessDetect (direction d)))
+      Tkn.Input                   : rest -> (rest, Just Input)
+      Tkn.Output                  : rest -> (rest, Just Output)
+      Tkn.Direction             d : rest -> (rest, Just (Direction (direction d)))
+      Tkn.Number a : Tkn.Number b : rest -> (rest, Just (Pause (read (a++b))))
+      _ : rest                           -> (rest, Nothing)
+    (ts'', cs) = parseMazeRow ts'
 
 
 printMaze :: [[Cell]] -> IO ()
