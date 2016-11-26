@@ -52,6 +52,7 @@ parseMaze [] = []
 parseMaze ts =  row : parseMaze ts'
   where (ts', row) = parseMazeRow ts
 
+
 parseMazeRow :: [Token] -> ([Token], [Cell])
 parseMazeRow (Tkn.NewLine:ts) = (ts, [])
 parseMazeRow [] = ([], [])
