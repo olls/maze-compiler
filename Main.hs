@@ -3,7 +3,7 @@ module Main (main) where
 import           System.Environment (getArgs)
 
 import           FunctionParser
-import           Maze
+import           MazeParser
 import           TokenParser
 
 

@@ -7,8 +7,8 @@ import Text.Show.Functions ()
 
 import           TokenParser (Token)
 import qualified TokenParser as Tkn
-import Maze
 import Car
+import Utilities
 
 
 type FunctionCondition = Car -> Bool
